@@ -195,7 +195,7 @@ public abstract class Server {
   private static final ThreadLocal<Call> CurCall = new ThreadLocal<Call>();
   
   /** Returns the remote side ip address when invoked inside an RPC 
-   *  Returns null incase of an error.
+   *  Returns null in case of an error.
    */
   public static InetAddress getRemoteIp() {
     Call call = CurCall.get();
@@ -1150,6 +1150,8 @@ public abstract class Server {
           authMethod = AuthMethod.read(new DataInputStream(
               new ByteArrayInputStream(method)));
           dataLengthBuffer.flip();          
+          //客户端版本号与服务器版本号对不上，服务器断开连接，客户端处理服务器主动断开的
+          //代码还没有检查过
           if (!HEADER.equals(dataLengthBuffer) || version != CURRENT_VERSION) {
             //Warning is ok since this is not supposed to happen.
             LOG.warn("Incorrect header or version mismatch from " + 
@@ -1161,7 +1163,7 @@ public abstract class Server {
           dataLengthBuffer.clear();
           if (authMethod == null) {
             throw new IOException("Unable to read authentication method");
-          }
+          } //处理完了rpcheader
           if (isSecurityEnabled && authMethod == AuthMethod.SIMPLE) {
             AccessControlException ae = new AccessControlException("Authorization ("
               + CommonConfigurationKeys.HADOOP_SECURITY_AUTHORIZATION
@@ -1190,7 +1192,7 @@ public abstract class Server {
           rpcHeaderBuffer = null;
           rpcHeaderRead = true;
           continue;
-        }
+        } //
         
         if (data == null) {
           dataLengthBuffer.flip();
@@ -1207,7 +1209,7 @@ public abstract class Server {
                 getHostAddress());
           }
           data = ByteBuffer.allocate(dataLength);
-        }
+        } 
         
         count = channelRead(channel, data);
         
@@ -1325,7 +1327,7 @@ public abstract class Server {
       if (headerRead) {
         processData(buf);
       } else {
-        processHeader(buf);
+        processHeader(buf); //设置了connection的protocol和user
         headerRead = true;
         if (!authorizeConnection()) {
           throw new AccessControlException("Connection from " + this
@@ -1342,7 +1344,7 @@ public abstract class Server {
         
       if (LOG.isDebugEnabled())
         LOG.debug(" got #" + id);
-
+      //paramClass is Invocation.Class
       Writable param = ReflectionUtils.newInstance(paramClass, conf);//read param
       param.readFields(dis);        
         

@@ -628,5 +628,11 @@
     authentication, and will abort the connection.
   </description>
 </property>
-
+<property>
+  <name>ipc.use-rdma</name>
+  <value>false</value>
+  <description>
+    use RDMA network for IPC
+  </description>
+</property>
 </configuration>

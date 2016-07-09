@@ -90,5 +90,15 @@ public class CommonConfigurationKeys {
 
   public static final String  IPC_CLIENT_FALLBACK_TO_SIMPLE_AUTH_ALLOWED_KEY = "ipc.client.fallback-to-simple-auth-allowed";
   public static final boolean IPC_CLIENT_FALLBACK_TO_SIMPLE_AUTH_ALLOWED_DEFAULT = false;
+  
+  /** modified by lynus */
+  public static final String IPC_USE_RDMA_KEY = "ipc.use-rdma";
+  public static final boolean IPC_USE_RDMA_DEFAULT = false;
+  public static final String IPC_RDMA_BIND_ADDRESS = 
+	  "ipc.rdma.bind.address";
+  public static final String IPC_RDMA_BIND_PORT = 
+	  "ipc.rdma.bind.port";
+  public static final int IPC_RDMA_BIND_PORT_DEFAULT = 9090;
+  /** lynus */
 }
 

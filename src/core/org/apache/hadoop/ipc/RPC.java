@@ -618,10 +618,97 @@ public class RPC {
       }
     }
   }
+  public static class RServer extends org.apache.hadoop.ipc.RDMAServer {
+      private Object instance;
+      private boolean verbose;
 
+      /** Construct an RPC server.
+       * @param instance the instance whose methods will be called
+       * @param conf the configuration to use
+       * @param bindAddress the address to bind on to listen for connection
+       * @param port the port to listen for connections on
+       */
+      public RServer(Object instance, Configuration conf, String bindAddress, int port) 
+        throws IOException {
+        this(instance, conf,  bindAddress, port, 1, false, null);
+      }
+      
+      private static String classNameBase(String className) {
+        String[] names = className.split("\\.", -1);
+        if (names == null || names.length == 0) {
+          return className;
+        }
+        return names[names.length-1];
+      }
+      
+      /** Construct an RPC server.
+       * @param instance the instance whose methods will be called
+       * @param conf the configuration to use
+       * @param bindAddress the address to bind on to listen for connection
+       * @param port the port to listen for connections on
+       * @param numHandlers the number of method handler threads to run
+       * @param verbose whether each call should be logged
+       */
+      public RServer(Object instance, Configuration conf, String bindAddress,  int port,
+                    int numHandlers, boolean verbose, 
+                    SecretManager<? extends TokenIdentifier> secretManager) 
+          throws IOException {
+        super(bindAddress, port, Invocation.class, numHandlers, conf,
+            classNameBase(instance.getClass().getName()));
+        this.instance = instance;
+        this.verbose = verbose;
+      }
+
+      public Writable call(Class<?> protocol, Writable param, long receivedTime) 
+      throws IOException {
+        try {
+          Invocation call = (Invocation)param;
+          if (verbose) log("Call: " + call);
+
+          Method method =
+            protocol.getMethod(call.getMethodName(),
+                                     call.getParameterClasses());
+          method.setAccessible(true);
+
+          long startTime = System.currentTimeMillis();
+          Object value = method.invoke(instance, call.getParameters());
+          int processingTime = (int) (System.currentTimeMillis() - startTime);
+          int qTime = (int) (startTime-receivedTime);
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("Served: " + call.getMethodName() +
+                      " queueTime= " + qTime +
+                      " procesingTime= " + processingTime);
+          }
+          rpcMetrics.addRpcQueueTime(qTime);
+          rpcMetrics.addRpcProcessingTime(processingTime);
+          rpcMetrics.addRpcProcessingTime(call.getMethodName(), processingTime);
+          if (verbose) log("Return: "+value);
+
+          return new ObjectWritable(method.getReturnType(), value);
+
+        } catch (InvocationTargetException e) {
+          Throwable target = e.getTargetException();
+          if (target instanceof IOException) {
+            throw (IOException)target;
+          } else {
+            IOException ioe = new IOException(target.toString());
+            ioe.setStackTrace(target.getStackTrace());
+            throw ioe;
+          }
+        } catch (Throwable e) {
+          if (!(e instanceof IOException)) {
+            LOG.error("Unexpected throwable object ", e);
+          }
+          IOException ioe = new IOException(e.toString());
+          ioe.setStackTrace(e.getStackTrace());
+          throw ioe;
+        }
+      }
+    }
   private static void log(String value) {
     if (value!= null && value.length() > 55)
       value = value.substring(0, 55)+"...";
     LOG.info(value);
   }
+  
 }
