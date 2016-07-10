@@ -953,7 +953,7 @@ public class Client {
 		private  ClientSession session= null;
 		private MsgPool mp;
 		private EventQueueHandler eqh;
-		private DataOutputBuffer out;	//jxio不支持单向消息, 需要用out存放header, 在第一个call请求发送时,首先发送out的内容
+		private DataOutputBuffer headerBuffer;	//jxio不支持单向消息, 需要用headerBuffer存放header, 在第一个call请求发送时,首先发送out的内容
 		private int rpcTimeout;		//不清楚jxio超时机制，先放到这里占位
 		private int maxIdleTime;	//默认为10秒
 		//	  private final RetryPolicy connectionRetryPolicy;
@@ -984,7 +984,7 @@ public class Client {
 					remoteId.getAddress().toString() +
 					" from " + ((ticket==null)?"an unknown user":ticket.getUserName()));
 			this.setDaemon(true);
-			this.out = new DataOutputBuffer();
+			this.headerBuffer = new DataOutputBuffer();
 
 		}
 		private void touch() {
@@ -1074,14 +1074,14 @@ public class Client {
 				return;
 			setupSession();
 			try {
-				out.write(Server.HEADER.array());	//"hrpc"
-				out.write(Server.CURRENT_VERSION);		// byte '4'
-				authMethod.write(out);		//auth //前三个是rpcheader
+				headerBuffer.write(Server.HEADER.array());	//"hrpc"
+				headerBuffer.write(Server.CURRENT_VERSION);		// byte '4'
+				authMethod.write(headerBuffer);		//auth //前三个是rpcheader
 				DataOutputBuffer buf = new DataOutputBuffer();
 				header.write(buf);
 				int bufLen = buf.getLength();
-				out.writeInt(bufLen);
-				out.write(buf.getData(), 0, bufLen);
+				headerBuffer.writeInt(bufLen);
+				headerBuffer.write(buf.getData(), 0, bufLen);
 				//等待链接建立(或者失败)的事件
 				int event  = eqh.runEventLoop(1, rpcTimeout * 1000000);
 				if (event == 0 || event == -1 || shouldCloseConnection.get()) {
@@ -1213,11 +1213,12 @@ public class Client {
 					if (msg ==  null)
 						throw new IOException("can not get msg from pool");
 				}
-				int len = out.getLength();
+				int len = headerBuffer.getLength();
 				if (len != 0) {
-					msg.getOut().put(out.getData(), 0, len);
-					out.reset();
+					msg.getOut().put(headerBuffer.getData(), 0, len);
+					headerBuffer.reset();
 				}
+				DataOutputBuffer out = new DataOutputBuffer();
 				out.writeInt(call.id);
 				call.param.write(out);
 				msg.getOut().putInt(out.getLength());
@@ -1226,13 +1227,15 @@ public class Client {
 				ByteBuffer msgBuf = msg.getOut();
 				msgBuf.position(41);
 				msgBuf.get(array);
-				session.sendRequest(msg);
+				synchronized(session) {
+					session.sendRequest(msg);
+				}
 			} catch(IOException e) {
 				markClosed(e);
 			} catch(Exception e) {
 				markClosed(new IOException("sendrequest() error"));
 			} 	finally {
-				out.reset(); 
+				headerBuffer.reset(); 
 			}
 		}
 	}
