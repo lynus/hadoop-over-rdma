@@ -2,6 +2,10 @@ package client;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import javax.net.SocketFactory;
 
@@ -14,6 +18,8 @@ import protocol.DemoProtocol;
 import server.TestConf;
 public class Client {
     public static void main(String[] args) {
+	final String TASK_THREAD_NUM_KEY = "client.task.size";
+	final int TASK_THREAD_NUM_DEFAULT = 1;
 	Configuration conf = new Configuration(false);
 	ClassLoader cl = TestConf.class.getClassLoader();
 	String p = cl.getResource("server/TestConf.class").getPath();
@@ -34,12 +40,34 @@ public class Client {
 	} catch (IOException e) {
 	    // TODO Auto-generated catch block
 	    e.printStackTrace();
+	    return;
 	}
-	if (protocol != null) {
-	    int i = protocol.mycall("haha");
-	    System.out.println("get message: " + i);
-	    RPC.stopProxy(protocol);
+	
+	int nThreads = conf.getInt(TASK_THREAD_NUM_KEY, TASK_THREAD_NUM_DEFAULT);
+	ExecutorService executorService = Executors.newFixedThreadPool(nThreads);
+	for (int i = 0; i < nThreads; i++) {
+	    executorService.submit(new Task(i, protocol));
 	}
+	executorService.shutdown();
+	try {
+	    executorService.awaitTermination(3, TimeUnit.SECONDS);
+	} catch (InterruptedException e) {}
+	RPC.stopProxy(protocol);
+    }
+    
+    static class Task implements Runnable {
+	private int id;
+	private DemoProtocol proto = null;
+	public Task(int id, DemoProtocol proto) {
+	    this.id = id;
+	    this.proto = proto;
+	}
+	@Override
+	public void run() {
+	   int i = proto.mycall("task #" + id);
+	   System.out.println("Task #" + id + " get reply: " + i);
+	}
+	
     }
 
 }

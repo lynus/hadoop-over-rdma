@@ -38,5 +38,8 @@
 	<name>ipc.rdma.bind.port</name>
 	<value>9090</value>
 </property>
-
+<property>
+	<name>client.task.size</name>
+	<value>5</value>
+</property>
 </configuration>
