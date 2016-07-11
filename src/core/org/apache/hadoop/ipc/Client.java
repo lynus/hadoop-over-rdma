@@ -69,14 +69,14 @@ import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.security.token.TokenInfo;
 import org.apache.hadoop.security.token.TokenSelector;
 import org.apache.hadoop.util.ReflectionUtils;
-/** modified by lynus */
+
 import org.accelio.jxio.Msg;
 import org.accelio.jxio.MsgPool;
 import org.accelio.jxio.EventName;
 import org.accelio.jxio.EventReason;
 import org.accelio.jxio.ClientSession;
 import org.accelio.jxio.EventQueueHandler;
-/* lynus */
+
 /** A client for an IPC service.  IPC calls take a single {@link Writable} as a
  * parameter, and return a {@link Writable} as their value.  A service runs on
  * a port and is defined by a parameter class and a value class.
@@ -1417,12 +1417,17 @@ public class Client {
 	 * <code>remoteId</code>, returning the value.  
 	 * Throws exceptions if there are network problems or if the remote code 
 	 * threw an exception. */
-	public Writable call(Writable param, ConnectionId remoteId)  
+	
+	/* We change this call to synchronized due to jxio's issue#23 
+	 * (https://github.com/accelio/JXIO/issues/23). We hava to make sure that
+	 * client.sendParam() does not issue to fast.		--lynus
+	 */
+	public synchronized Writable call(Writable param, ConnectionId remoteId)  
 			throws InterruptedException, IOException {
 		Call call = new Call(param);
 		if (!useRDMA ){
 			Connection connection = getConnection(remoteId, call);
-			connection.sendParam(call);                 // send the parameter
+			connection.sendParam(call);  // send the parameter
 		} else {
 			RdmaConnection connection = getRdmaConnection(remoteId, call);
 			connection.sendParam(call);  
